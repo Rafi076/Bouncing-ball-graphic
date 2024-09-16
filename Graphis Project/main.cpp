@@ -6,8 +6,8 @@
 // Ball position and speed
 float ballX = 0.0f;
 float ballY = 0.0f;
-float ballSpeedX = 0.008f;  // Speed on X-axis (increased)
-float ballSpeedY = 0.01f;   // Speed on Y-axis (increased)
+float ballSpeedX = 0.015f;  // Increased Speed on X-axis
+float ballSpeedY = 0.02f;   // Increased Speed on Y-axis
 float ballRadius = 0.1f;
 
 // Window dimensions
@@ -23,17 +23,16 @@ float rectBottom = -0.9f;
 // Game state
 bool gameOver = false;
 bool playerWon = false;
-bool restartFlag = false;
 int playerScore = 0;
 int computerScore = 0;
+const int maxScore = 5;  // Score needed to win the game
 
 // Timer
-int timerValue = 20;  // 20 seconds for the player to click the ball
+int timerValue = 10;  // 10 seconds for the player to click the ball
 time_t startTime;
 
-// Function prototypes (including update function)
-void update(int value);  // <== Declaration
-void restartGame();      // Declaration for restartGame
+// Function prototypes
+void update(int value);
 
 // Function to convert screen coordinates to world coordinates
 void screenToWorld(int x, int y, float &worldX, float &worldY) {
@@ -43,9 +42,24 @@ void screenToWorld(int x, int y, float &worldX, float &worldY) {
     worldX *= aspect;  // Adjust for aspect ratio
 }
 
-// Function to draw the ball
+// Function to draw the ball with a white outline
 void drawBall(float x, float y, float radius) {
     int numSegments = 100;
+
+    // Draw the white outline (slightly larger than the ball)
+    glColor3f(1.0f, 1.0f, 1.0f);  // White outline
+    glBegin(GL_TRIANGLE_FAN);
+    glVertex2f(x, y);  // Center of circle
+    for (int i = 0; i <= numSegments; i++) {
+        float angle = 2.0f * M_PI * i / numSegments;
+        float dx = cos(angle) * (radius + 0.01f);  // Slightly larger radius for the outline
+        float dy = sin(angle) * (radius + 0.01f);
+        glVertex2f(x + dx, y + dy);
+    }
+    glEnd();
+
+    // Draw the inner black ball
+    glColor3f(0.0f, 0.0f, 0.0f);  // Black color for the ball
     glBegin(GL_TRIANGLE_FAN);
     glVertex2f(x, y);  // Center of circle
     for (int i = 0; i <= numSegments; i++) {
@@ -83,21 +97,6 @@ bool isInsideBall(float x, float y, float ballX, float ballY, float radius) {
     return dist <= radius;
 }
 
-// Function to restart the game
-void restartGame() {
-    gameOver = false;
-    playerWon = false;
-    ballX = 0.0f;
-    ballY = 0.0f;
-    ballSpeedX = 0.008f;   // Reset ball speed on the X-axis
-    ballSpeedY = 0.01f;    // Reset ball speed on the Y-axis
-    timerValue = 20;       // Set timer to 20 seconds
-    startTime = time(0);   // Start a new timer
-    restartFlag = false;
-    glutPostRedisplay();   // Force re-render of the window
-    glutTimerFunc(16, update, 0);  // Restart the update loop
-}
-
 // Mouse click event handling for ball
 void mouse(int button, int state, int x, int y) {
     if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
@@ -106,14 +105,16 @@ void mouse(int button, int state, int x, int y) {
 
         // Check if the mouse click is inside the ball
         if (!gameOver && isInsideBall(worldX, worldY, ballX, ballY, ballRadius)) {
-            gameOver = true;  // End the game if the ball is clicked
-            playerWon = true;
-            playerScore++;     // Player wins, increment score
+            playerScore++;     // Player scores if the ball is clicked
+            if (playerScore == maxScore) {
+                gameOver = true;
+                playerWon = true;
+            }
         }
     }
 }
 
-// Function to display win/lose messages and scores
+// Function to display win/lose messages, scores, and reset button
 void display() {
     glClear(GL_COLOR_BUFFER_BIT);
 
@@ -122,12 +123,11 @@ void display() {
 
     if (!gameOver) {
         // Draw the ball
-        glColor3f(1.0f, 0.0f, 0.0f);  // Red color for the ball
         drawBall(ballX, ballY, ballRadius);
 
         // Display message above the rectangle
         glColor3f(1.0f, 1.0f, 1.0f);  // White color for text
-        drawText("Touch the ball & win the game!!", -0.4f, 0.95f);
+        drawText("Touch the ball & win points!!", -0.4f, 0.95f);
 
         // Display timer
         char timerText[20];
@@ -142,11 +142,10 @@ void display() {
         // Display Game Over message and the result
         glColor3f(1.0f, 1.0f, 1.0f);  // White color for text
         if (playerWon) {
-            drawText("Player Wins!", -0.1f, 0.0f);
+            drawText("Player Wins the Game!", -0.2f, 0.0f);
         } else {
-            drawText("Computer Wins!", -0.15f, 0.0f);
+            drawText("Computer Wins the Game!", -0.25f, 0.0f);
         }
-        restartFlag = true;  // Set the flag to restart the game
     }
 
     glutSwapBuffers();
@@ -169,19 +168,23 @@ void update(int value) {
 
         // Timer logic
         time_t currentTime = time(0);
-        timerValue = 20 - difftime(currentTime, startTime);
+        timerValue = 10 - difftime(currentTime, startTime);
 
         // Check if time is up
         if (timerValue <= 0) {
-            gameOver = true;
             computerScore++;  // Increment computer's score if time is up
+            if (computerScore == maxScore) {
+                gameOver = true;
+                playerWon = false;
+            } else {
+                // Restart timer
+                startTime = time(0);
+                timerValue = 10;
+            }
         }
 
         glutPostRedisplay();
         glutTimerFunc(16, update, 0);  // Call update function after 16 ms
-    } else if (restartFlag) {
-        // Restart the game after game over
-        restartGame();
     }
 }
 
@@ -199,12 +202,17 @@ void reshape(int w, int h) {
     glMatrixMode(GL_MODELVIEW);
 }
 
+// Change the mouse cursor to resemble a bat
+void setMouseCursor() {
+    glutSetCursor(GLUT_CURSOR_CROSSHAIR);
+}
+
 // Main function
 int main(int argc, char **argv) {
     glutInit(&argc, argv);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
     glutInitWindowSize(windowWidth, windowHeight);
-    glutCreateWindow("Bouncing Ball with Game Over");
+    glutCreateWindow("Bouncing Ball with Scoring and Time Limit");
 
     glutDisplayFunc(display);
     glutReshapeFunc(reshape);
@@ -213,6 +221,8 @@ int main(int argc, char **argv) {
 
     startTime = time(0);               // Start the timer
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);  // Black background
+
+    setMouseCursor();  // Set the mouse cursor to a custom style
 
     glutMainLoop();
     return 0;

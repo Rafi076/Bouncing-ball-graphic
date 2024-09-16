@@ -875,3 +875,9 @@
 1526093414 c:\program files\codeblocks\mingw\x86_64-w64-mingw32\include\gl\glu.h
 	<GL/gl.h>
 
+1726511815 source:c:\users\hp\desktop\bouncing-ball-graphic\graphis project\main.cpp
+	<GL/glut.h>
+	<cmath>
+	<iostream>
+	<ctime>
+
